@@ -55,7 +55,7 @@ services:
     image: solarpilot-nginx:latest
     restart: unless-stopped
     ports:
-      - "8000:80"
+      - "8822:80"
     networks:
       - solarpilot-network
     depends_on:
