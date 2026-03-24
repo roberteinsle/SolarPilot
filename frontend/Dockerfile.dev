@@ -6,7 +6,13 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install
 
+# Config-Dateien und index.html kopieren
+COPY vite.config.js ./
+COPY tailwind.config.js ./
+COPY postcss.config.js ./
+COPY index.html ./
+
 EXPOSE 3000
 
 # Vite Dev-Server starten (Hot-Reload)
-CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "3000"]
