@@ -99,14 +99,10 @@ class SolplanetCollector:
         """
         Parst Rohdaten vom Dongle in strukturierte Form.
 
-        ⚠️ TODO: Diese Methode muss angepasst werden!
-        Die Keys im JSON sind noch unbekannt. Vorher mit curl testen:
-
-        curl "http://192.168.10.113:8484/getdevdata.cgi?device=2&sn=UR015K6052540222"
-        curl "http://192.168.10.113:8484/getdevdata.cgi?device=3&sn=UR015K6052540222"
-        curl "http://192.168.10.113:8484/getdevdata.cgi?device=4&sn=UR015K6052540222"
-
-        Dann die echten Keys hier eintragen!
+        Verwendet echte API-Keys von Solplanet Ai-Dongle:
+        - MPPT: vpv/ipv Arrays (Index 0-2, in 0.1V/0.1A)
+        - Battery: soc (%), pb (W), vb (0.1V), cb (0.1A), tb (0.1°C)
+        - Grid: pac (W), fac (0.01Hz)
 
         Args:
             raw_data: Rohdaten von poll_all_devices()
@@ -118,21 +114,17 @@ class SolplanetCollector:
         battery = raw_data.get("battery", {})
         smartmeter = raw_data.get("smartmeter", {})
 
-        # ⚠️ PLACEHOLDER: Diese Keys müssen angepasst werden!
-        # Mögliche Key-Namen (unbestätigt):
-        # - MPPT: vpv1/ipv1/ppv1, vpv2/ipv2/ppv2, vpv3/ipv3/ppv3
-        # - Oder: mppt1_voltage, mppt1_current, mppt1_power
-        # - Oder: pv1_voltage, pv1_current, pv1_power
+        # MPPT-Daten aus Arrays extrahieren
+        # vpv und ipv sind Arrays mit 4 Werten (Index 0-2 aktiv, Index 3 ist 0)
+        # Einheiten: vpv in 0.1V, ipv in 0.1A
+        vpv = inverter.get("vpv", [0, 0, 0, 0])
+        ipv = inverter.get("ipv", [0, 0, 0, 0])
 
-        # MPPT-Leistungen extrahieren (W → kW)
-        # TODO: Echte Keys verwenden!
-        mppt1_power_w = inverter.get("ppv1", 0)  # ⚠️ Beispiel-Key
-        mppt2_power_w = inverter.get("ppv2", 0)  # ⚠️ Beispiel-Key
-        mppt3_power_w = inverter.get("ppv3", 0)  # ⚠️ Beispiel-Key
-
-        mppt1_power = mppt1_power_w / 1000
-        mppt2_power = mppt2_power_w / 1000
-        mppt3_power = mppt3_power_w / 1000
+        # MPPT-Leistungen berechnen (V * A = W → kW)
+        # 0.1V * 0.1A = 0.01W → /1000 für kW
+        mppt1_power = (vpv[0] * ipv[0] * 0.01) / 1000
+        mppt2_power = (vpv[1] * ipv[1] * 0.01) / 1000
+        mppt3_power = (vpv[2] * ipv[2] * 0.01) / 1000
 
         # Ost/West-Split berechnen basierend auf Config
         pv_east_power = sum([
@@ -147,18 +139,16 @@ class SolplanetCollector:
             mppt3_power if 3 in settings.mppt_west_list else 0
         ])
 
-        # Batterie-Daten
-        # TODO: Echte Keys verwenden!
-        battery_soc = battery.get("soc", 0)                # ⚠️ Beispiel-Key
-        battery_power_w = battery.get("pb", 0)             # ⚠️ Beispiel-Key (pb = battery power?)
-        battery_voltage = battery.get("vb", 0)             # ⚠️ Beispiel-Key
-        battery_current = battery.get("ib", 0)             # ⚠️ Beispiel-Key
-        battery_temp = battery.get("temp", 0)              # ⚠️ Beispiel-Key
+        # Batterie-Daten (alle Einheiten bereits korrekt oder mit Faktor)
+        battery_soc = battery.get("soc", 0)                # SOC in %
+        battery_power_w = battery.get("pb", 0)             # Battery power in W
+        battery_voltage = battery.get("vb", 0) / 10        # 0.1V → V
+        battery_current = battery.get("cb", 0) / 10        # 0.1A → A (cb nicht ib!)
+        battery_temp = battery.get("tb", 0) / 10           # 0.1°C → °C (tb nicht temp!)
 
         # Netz-Daten
-        # TODO: Echte Keys verwenden!
-        grid_power_w = smartmeter.get("pac", 0)            # ⚠️ Beispiel-Key
-        grid_frequency = smartmeter.get("fac", 50)         # ⚠️ Beispiel-Key
+        grid_power_w = smartmeter.get("pac", 0)            # Grid power in W
+        grid_frequency = smartmeter.get("fac", 5000) / 100 # 0.01Hz → Hz (5000 = 50.00Hz)
 
         # Strukturierte Daten
         parsed = {
@@ -171,16 +161,16 @@ class SolplanetCollector:
 
             # MPPT-Details
             "mppt1_power": mppt1_power,
-            "mppt1_voltage": inverter.get("vpv1", 0),      # ⚠️ Beispiel-Key
-            "mppt1_current": inverter.get("ipv1", 0),      # ⚠️ Beispiel-Key
+            "mppt1_voltage": vpv[0] / 10,                  # 0.1V → V
+            "mppt1_current": ipv[0] / 10,                  # 0.1A → A
 
             "mppt2_power": mppt2_power,
-            "mppt2_voltage": inverter.get("vpv2", 0),      # ⚠️ Beispiel-Key
-            "mppt2_current": inverter.get("ipv2", 0),      # ⚠️ Beispiel-Key
+            "mppt2_voltage": vpv[1] / 10,                  # 0.1V → V
+            "mppt2_current": ipv[1] / 10,                  # 0.1A → A
 
             "mppt3_power": mppt3_power,
-            "mppt3_voltage": inverter.get("vpv3", 0),      # ⚠️ Beispiel-Key
-            "mppt3_current": inverter.get("ipv3", 0),      # ⚠️ Beispiel-Key
+            "mppt3_voltage": vpv[2] / 10,                  # 0.1V → V
+            "mppt3_current": ipv[2] / 10,                  # 0.1A → A
 
             # Batterie
             "battery_soc": battery_soc,
@@ -193,8 +183,8 @@ class SolplanetCollector:
             "grid_power": grid_power_w / 1000,             # W → kW
             "grid_frequency": grid_frequency,
 
-            # Status
-            "inverter_status": inverter.get("status", "unknown"),  # ⚠️ Beispiel-Key
+            # Status (stu = status, 1 = online)
+            "inverter_status": "online" if inverter.get("stu", 0) == 1 else "offline"
         }
 
         # Hausverbrauch berechnen (Energiebilanz)
