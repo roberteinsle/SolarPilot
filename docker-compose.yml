@@ -1,0 +1,76 @@
+version: '3.8'
+
+services:
+  backend:
+    container_name: solarpilot-app
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: solarpilot-backend:latest
+    restart: unless-stopped
+    volumes:
+      - ./data:/app/data
+    environment:
+      - DATABASE_PATH=${DATABASE_PATH:-/app/data/solarpilot.db}
+      - DONGLE_IP=${DONGLE_IP}
+      - DONGLE_PORT=${DONGLE_PORT}
+      - DONGLE_SN=${DONGLE_SN}
+      - MPPT_EAST=${MPPT_EAST}
+      - MPPT_WEST=${MPPT_WEST}
+      - PV_TOTAL_KWP=${PV_TOTAL_KWP}
+      - PV_EAST_KWP=${PV_EAST_KWP}
+      - PV_WEST_KWP=${PV_WEST_KWP}
+      - PUSHOVER_APP_TOKEN=${PUSHOVER_APP_TOKEN}
+      - PUSHOVER_USER_KEY=${PUSHOVER_USER_KEY}
+      - POLL_INTERVAL=${POLL_INTERVAL:-30}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    networks:
+      - solarpilot-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  frontend:
+    container_name: solarpilot-web
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: solarpilot-frontend:latest
+    restart: unless-stopped
+    environment:
+      - VITE_API_URL=/api
+    networks:
+      - solarpilot-network
+    depends_on:
+      - backend
+
+  nginx:
+    container_name: nginx-proxy
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+    image: solarpilot-nginx:latest
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    networks:
+      - solarpilot-network
+    depends_on:
+      - backend
+      - frontend
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  solarpilot-network:
+    driver: bridge
+
+volumes:
+  solarpilot-data:
+    driver: local

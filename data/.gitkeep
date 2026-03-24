@@ -1,0 +1,2 @@
+# Dieses Verzeichnis speichert die SQLite-Datenbank (solarpilot.db).
+# Die .db-Dateien sind in .gitignore ausgeschlossen.

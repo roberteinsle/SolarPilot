@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  backend:
+    container_name: solarpilot-app-dev
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ./data:/app/data
+      - ./backend/app:/app/app  # Hot-Reload für Entwicklung
+    environment:
+      - DATABASE_PATH=${DATABASE_PATH:-/app/data/solarpilot.db}
+      - DONGLE_IP=${DONGLE_IP}
+      - DONGLE_PORT=${DONGLE_PORT}
+      - DONGLE_SN=${DONGLE_SN}
+      - MPPT_EAST=${MPPT_EAST}
+      - MPPT_WEST=${MPPT_WEST}
+      - PV_TOTAL_KWP=${PV_TOTAL_KWP}
+      - PV_EAST_KWP=${PV_EAST_KWP}
+      - PV_WEST_KWP=${PV_WEST_KWP}
+      - PUSHOVER_APP_TOKEN=${PUSHOVER_APP_TOKEN}
+      - PUSHOVER_USER_KEY=${PUSHOVER_USER_KEY}
+      - POLL_INTERVAL=${POLL_INTERVAL:-30}
+      - LOG_LEVEL=DEBUG
+      - RELOAD=true
+    ports:
+      - "8080:8080"  # Direkt exposed für Entwicklung
+    networks:
+      - solarpilot-network
+
+  frontend:
+    container_name: solarpilot-web-dev
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ./frontend/src:/app/src  # Hot-Reload
+      - ./frontend/public:/app/public
+      - /app/node_modules  # Verhindert Host node_modules
+    environment:
+      - VITE_API_URL=http://localhost:8080/api
+    ports:
+      - "3000:3000"  # Direkt exposed
+    networks:
+      - solarpilot-network
+    depends_on:
+      - backend
+
+networks:
+  solarpilot-network:
+    driver: bridge
